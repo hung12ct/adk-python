@@ -41,12 +41,8 @@ def test_load_dialect_impl_mysql(pickle_type):
 
   impl = pickle_type.load_dialect_impl(mock_dialect)
 
-  # Verify type_descriptor was called once
-  assert mock_dialect.type_descriptor.call_count == 1
-  # Verify it was called with mysql.LONGBLOB type
-  call_args = mock_dialect.type_descriptor.call_args[0][0]
-  assert call_args.__name__ == "LONGBLOB"
-  assert call_args == mysql.LONGBLOB
+  # Verify type_descriptor was called once with mysql.LONGBLOB
+  mock_dialect.type_descriptor.assert_called_once_with(mysql.LONGBLOB)
   # Verify the return value is what we expect
   assert impl == mock_longblob_type
 
@@ -73,24 +69,17 @@ def test_load_dialect_impl_default(pickle_type):
   assert impl == pickle_type.impl
 
 
-def test_process_bind_param_mysql(pickle_type):
-  """Test that MySQL dialect pickles the value."""
+@pytest.mark.parametrize(
+    "dialect_name",
+    [
+        pytest.param("mysql", id="mysql"),
+        pytest.param("spanner+spanner", id="spanner"),
+    ],
+)
+def test_process_bind_param_pickle_dialects(pickle_type, dialect_name):
+  """Test that MySQL and Spanner dialects pickle the value."""
   mock_dialect = mock.Mock()
-  mock_dialect.name = "mysql"
-
-  test_data = {"key": "value", "nested": [1, 2, 3]}
-  result = pickle_type.process_bind_param(test_data, mock_dialect)
-
-  # Should be pickled bytes
-  assert isinstance(result, bytes)
-  # Should be able to unpickle back to original
-  assert pickle.loads(result) == test_data
-
-
-def test_process_bind_param_spanner(pickle_type):
-  """Test that Spanner dialect pickles the value."""
-  mock_dialect = mock.Mock()
-  mock_dialect.name = "spanner+spanner"
+  mock_dialect.name = dialect_name
 
   test_data = {"key": "value", "nested": [1, 2, 3]}
   result = pickle_type.process_bind_param(test_data, mock_dialect)
@@ -122,24 +111,17 @@ def test_process_bind_param_none(pickle_type):
   assert result is None
 
 
-def test_process_result_value_mysql(pickle_type):
-  """Test that MySQL dialect unpickles the value."""
+@pytest.mark.parametrize(
+    "dialect_name",
+    [
+        pytest.param("mysql", id="mysql"),
+        pytest.param("spanner+spanner", id="spanner"),
+    ],
+)
+def test_process_result_value_pickle_dialects(pickle_type, dialect_name):
+  """Test that MySQL and Spanner dialects unpickle the value."""
   mock_dialect = mock.Mock()
-  mock_dialect.name = "mysql"
-
-  test_data = {"key": "value", "nested": [1, 2, 3]}
-  pickled_data = pickle.dumps(test_data)
-
-  result = pickle_type.process_result_value(pickled_data, mock_dialect)
-
-  # Should be unpickled back to original
-  assert result == test_data
-
-
-def test_process_result_value_spanner(pickle_type):
-  """Test that Spanner dialect unpickles the value."""
-  mock_dialect = mock.Mock()
-  mock_dialect.name = "spanner+spanner"
+  mock_dialect.name = dialect_name
 
   test_data = {"key": "value", "nested": [1, 2, 3]}
   pickled_data = pickle.dumps(test_data)
@@ -171,31 +153,17 @@ def test_process_result_value_none(pickle_type):
   assert result is None
 
 
-def test_roundtrip_mysql(pickle_type):
-  """Test full roundtrip for MySQL: bind -> result."""
+@pytest.mark.parametrize(
+    "dialect_name",
+    [
+        pytest.param("mysql", id="mysql"),
+        pytest.param("spanner+spanner", id="spanner"),
+    ],
+)
+def test_roundtrip_pickle_dialects(pickle_type, dialect_name):
+  """Test full roundtrip for MySQL and Spanner: bind -> result."""
   mock_dialect = mock.Mock()
-  mock_dialect.name = "mysql"
-
-  original_data = {
-      "string": "test",
-      "number": 42,
-      "list": [1, 2, 3],
-      "nested": {"a": 1, "b": 2},
-  }
-
-  # Simulate bind (Python -> DB)
-  bound_value = pickle_type.process_bind_param(original_data, mock_dialect)
-  assert isinstance(bound_value, bytes)
-
-  # Simulate result (DB -> Python)
-  result_value = pickle_type.process_result_value(bound_value, mock_dialect)
-  assert result_value == original_data
-
-
-def test_roundtrip_spanner(pickle_type):
-  """Test full roundtrip for Spanner: bind -> result."""
-  mock_dialect = mock.Mock()
-  mock_dialect.name = "spanner+spanner"
+  mock_dialect.name = dialect_name
 
   original_data = {
       "string": "test",
